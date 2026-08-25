@@ -6,4 +6,4 @@
 - [x] T4: Asignación docente -> materia -> grupo
 - [x] T5: Registrar asistencia
 - [x] T6: Query reactiva de % de asistencia (alumno)
-- [ ] T7: Notificación de inasistencia (email vía Resend)
+- [x] T7: Notificación de inasistencia (email vía Resend)
