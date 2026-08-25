@@ -108,3 +108,38 @@ export const listAttendanceByGroupDate = query({
       .collect();
   },
 });
+
+// Calcula estadisticas de asistencia de un alumno: conteos por estado
+// y porcentaje. Si se pasa groupId, filtra solo esa materia/grupo;
+// si no, cuenta todos los registros del alumno.
+export const getStudentAttendanceStats = query({
+  args: {
+    studentId: v.id("users"),
+    groupId: v.optional(v.id("groups")),
+  },
+  handler: async (ctx, args) => {
+    let records = await ctx.db
+      .query("attendanceRecords")
+      .withIndex("by_student", (q) => q.eq("studentId", args.studentId))
+      .collect();
+
+    if (args.groupId) {
+      records = records.filter((r) => r.groupId === args.groupId);
+    }
+
+    const total = records.length;
+    const counts = {
+      presente: records.filter((r) => r.status === "presente").length,
+      ausente: records.filter((r) => r.status === "ausente").length,
+      retardo: records.filter((r) => r.status === "retardo").length,
+      justificado: records.filter((r) => r.status === "justificado").length,
+    };
+
+    const percentage =
+      total === 0
+        ? 0
+        : Math.round(((counts.presente + counts.retardo) / total) * 100);
+
+    return { total, counts, percentage };
+  },
+});
