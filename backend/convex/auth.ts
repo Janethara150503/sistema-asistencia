@@ -2,6 +2,19 @@ import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import bcrypt from "bcryptjs";
 
+// Quita campos sensibles antes de exponer un usuario fuera del servidor.
+export function sanitizeUser(user: any) {
+  return {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    photoUrl: user.photoUrl,
+    theme: user.theme,
+  };
+}
+
 // Genera un token simple y unico para la sesion.
 // No es criptograficamente perfecto, pero es suficiente para MVP.
 function generateToken(): string {
