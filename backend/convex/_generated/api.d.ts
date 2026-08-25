@@ -12,6 +12,7 @@ import type * as academic from "../academic.js";
 import type * as assignments from "../assignments.js";
 import type * as attendance from "../attendance.js";
 import type * as auth from "../auth.js";
+import type * as notifications from "../notifications.js";
 
 import type {
   ApiFromModules,
@@ -24,6 +25,7 @@ declare const fullApi: ApiFromModules<{
   assignments: typeof assignments;
   attendance: typeof attendance;
   auth: typeof auth;
+  notifications: typeof notifications;
 }>;
 
 /**

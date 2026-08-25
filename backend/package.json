@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "convex": "^1.44.0"
+    "convex": "^1.44.0",
+    "resend": "^6.22.1"
   },
   "devDependencies": {
     "@convex-dev/eslint-plugin": "^4.0.0",
