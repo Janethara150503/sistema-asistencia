@@ -4,6 +4,6 @@
 - [x] T2: Función de login + sesión (token)
 - [x] T3: CRUD configuración académica (ciclos/grados/grupos/materias)
 - [x] T4: Asignación docente -> materia -> grupo
-- [ ] T5: Registrar asistencia
+- [x] T5: Registrar asistencia
 - [ ] T6: Query reactiva de % de asistencia (alumno)
 - [ ] T7: Notificación de inasistencia (email vía Resend)
