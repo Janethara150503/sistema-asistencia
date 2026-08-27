@@ -1,124 +1,190 @@
 import flet as ft
-from mocks import MOCK_USERS, NAV_ITEMS
+from convex_client import client
+from mocks import NAV_ITEMS
 
-# Ancho límite: por encima usamos Navigation Rail (escritorio/tablet),
-# por debajo usamos Bottom Navigation (Fitts law: botones alcanzables
-# con el pulgar en móvil).
 BREAKPOINT_DESKTOP = 700
 
 
 def main(page: ft.Page):
     page.title = "Sistema de Asistencia"
-    # Paleta: teal como color primario (transmite orden/confianza,
-    # apropiado para un contexto escolar), Material 3.
     page.theme = ft.Theme(color_scheme_seed=ft.Colors.TEAL)
     page.padding = 0
+    page.bgcolor = ft.Colors.WHITE
 
-    # Estado simple en memoria (mock de "sesión activa").
-    # En FASE 4 esto vendrá de la tabla `sessions` real.
-    state = {"role": "admin", "selected_index": 0}
+    session = {"token": None, "user": None}
+
+    email_field = ft.TextField(
+        label="Correo electronico",
+        prefix_icon=ft.Icons.EMAIL_OUTLINED,
+        width=320,
+        border_radius=8,
+    )
+    password_field = ft.TextField(
+        label="Contrasena",
+        prefix_icon=ft.Icons.LOCK_OUTLINE,
+        password=True,
+        can_reveal_password=True,
+        width=320,
+        border_radius=8,
+    )
+    login_button = ft.ElevatedButton(
+        content=ft.Text("Iniciar sesion", size=16),
+        width=320,
+        height=48,
+        bgcolor=ft.Colors.TEAL,
+        color=ft.Colors.WHITE,
+    )
+    login_spinner = ft.ProgressRing(width=16, height=16, stroke_width=2, visible=False)
+
+    def show_error(message: str):
+        page.snack_bar = ft.SnackBar(content=ft.Text(message), bgcolor=ft.Colors.ERROR)
+        page.snack_bar.open = True
+        page.update()
+
+    def set_loading(is_loading: bool):
+        login_button.disabled = is_loading
+        login_spinner.visible = is_loading
+        page.update()
+
+    def do_login(e):
+        email = email_field.value.strip()
+        password = password_field.value
+
+        if not email or not password:
+            show_error("Ingresa correo y contrasena")
+            return
+
+        set_loading(True)
+        try:
+            result = client.mutation(
+                "auth:login", {"email": email, "password": password}
+            )
+            session["token"] = result["token"]
+            session["user"] = result["user"]
+            build_app_view()
+        except Exception:
+            show_error("Correo o contrasena incorrectos")
+        finally:
+            set_loading(False)
+
+    login_button.on_click = do_login
+
+    form_column = ft.Column(
+        [
+            ft.Text("Bienvenido", size=28, weight=ft.FontWeight.W_700),
+            ft.Text("Inicia sesion en tu cuenta", color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Container(height=24),
+            email_field,
+            ft.Container(height=8),
+            password_field,
+            ft.Container(height=16),
+            ft.Row([login_button, login_spinner], alignment=ft.MainAxisAlignment.START),
+        ],
+        horizontal_alignment=ft.CrossAxisAlignment.START,
+        alignment=ft.MainAxisAlignment.CENTER,
+    )
+
+    brand_panel = ft.Container(
+        content=ft.Column(
+            [
+                ft.Text("Sistema de Asistencia", size=26, weight=ft.FontWeight.W_700, color=ft.Colors.WHITE),
+                ft.Container(height=16),
+                ft.Text(
+                    "Gestion digital de asistencia escolar para administradores, docentes y alumnos.",
+                    color=ft.Colors.WHITE70,
+                    size=14,
+                ),
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,
+        ),
+        bgcolor=ft.Colors.TEAL,
+        padding=40,
+        expand=1,
+    )
+
+    form_panel = ft.Container(
+        content=form_column,
+        padding=40,
+        alignment=ft.alignment.Alignment(0, 0),
+        expand=1,
+    )
+
+    login_view_desktop = ft.Row([brand_panel, form_panel], expand=True)
+    login_view_mobile = ft.Container(content=form_panel, expand=True)
 
     content_area = ft.Container(expand=True, padding=20)
     nav_rail = ft.NavigationRail(visible=False)
     nav_bar = ft.NavigationBar(visible=False)
+    app_state = {"selected_index": 0}
 
-    def build_destinations_rail(role: str):
+    def build_destinations_rail(role):
         return [
-            ft.NavigationRailDestination(
-                icon=getattr(ft.Icons, icon_name),
-                label=label,
-            )
-            for icon_name, label in NAV_ITEMS[role]
+            ft.NavigationRailDestination(icon=getattr(ft.Icons, icon), label=label)
+            for icon, label in NAV_ITEMS[role]
         ]
 
-    def build_destinations_bar(role: str):
+    def build_destinations_bar(role):
         return [
-            ft.NavigationBarDestination(
-                icon=getattr(ft.Icons, icon_name),
-                label=label,
-            )
-            for icon_name, label in NAV_ITEMS[role]
+            ft.NavigationBarDestination(icon=getattr(ft.Icons, icon), label=label)
+            for icon, label in NAV_ITEMS[role]
         ]
 
     def render_content():
-        # Estado del sistema visible: mostramos qué rol y qué sección
-        # está activa, evitando que el usuario se pierda.
-        role = state["role"]
-        label = NAV_ITEMS[role][state["selected_index"]][1]
-        user = MOCK_USERS[role]
+        role = session["user"]["role"]
+        label = NAV_ITEMS[role][app_state["selected_index"]][1]
         content_area.content = ft.Column(
             [
-                ft.Text(f"Sección: {label}", size=22, weight=ft.FontWeight.W_500),
-                ft.Text(f"Usuario: {user['name']} ({role})", color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text(f"Seccion: {label}", size=22, weight=ft.FontWeight.W_500),
+                ft.Text(
+                    f"Usuario: {session['user']['name']} ({role})",
+                    color=ft.Colors.ON_SURFACE_VARIANT,
+                ),
                 ft.Divider(),
-                ft.Text("Contenido simulado — se conecta a Convex en FASE 4."),
+                ft.Text("Conectado a Convex real."),
             ]
         )
         page.update()
 
-    def on_rail_change(e):
-        state["selected_index"] = e.control.selected_index
+    def on_nav_change(e):
+        app_state["selected_index"] = e.control.selected_index
         render_content()
 
-    def on_bar_change(e):
-        state["selected_index"] = e.control.selected_index
-        render_content()
+    def show_login_view(width):
+        page.controls.clear()
+        if width >= BREAKPOINT_DESKTOP:
+            page.add(login_view_desktop)
+        else:
+            page.add(login_view_mobile)
+        page.update()
 
-    def apply_layout(width: int):
-        # Aquí ocurre la decisión responsiva: un solo layout activo a la vez.
+    def apply_layout(width):
         is_desktop = width >= BREAKPOINT_DESKTOP
         nav_rail.visible = is_desktop
         nav_bar.visible = not is_desktop
         page.update()
 
-    def switch_role(role: str):
-        state["role"] = role
-        state["selected_index"] = 0
+    def build_app_view():
+        role = session["user"]["role"]
         nav_rail.destinations = build_destinations_rail(role)
         nav_rail.selected_index = 0
+        nav_rail.label_type = ft.NavigationRailLabelType.ALL
+        nav_rail.on_change = on_nav_change
+
         nav_bar.destinations = build_destinations_bar(role)
         nav_bar.selected_index = 0
+        nav_bar.on_change = on_nav_change
+        page.navigation_bar = nav_bar
+
+        page.controls.clear()
+        page.add(
+            ft.Row([nav_rail, ft.VerticalDivider(width=1), content_area], expand=True)
+        )
+        apply_layout(page.width)
+        page.on_resize = lambda e: apply_layout(page.width)
         render_content()
 
-    # Configuración inicial de los controles de navegación
-    nav_rail.destinations = build_destinations_rail(state["role"])
-    nav_rail.selected_index = 0
-    nav_rail.label_type = ft.NavigationRailLabelType.ALL
-    nav_rail.on_change = on_rail_change
-
-    nav_bar.destinations = build_destinations_bar(state["role"])
-    nav_bar.selected_index = 0
-    nav_bar.on_change = on_bar_change
-    page.navigation_bar = nav_bar
-
-    # Selector de rol temporal (simula "login" mientras no hay auth real)
-    role_selector = ft.SegmentedButton(
-        selected=[state["role"]],
-        segments=[
-            ft.Segment(value="admin", label=ft.Text("Admin")),
-            ft.Segment(value="docente", label=ft.Text("Docente")),
-            ft.Segment(value="alumno", label=ft.Text("Alumno")),
-        ],
-        on_change=lambda e: switch_role(list(e.control.selected)[0]),
-    )
-
-    page.add(
-        ft.Container(
-            content=ft.Row(
-                [ft.Text("Vista de prueba — rol:"), role_selector],
-                alignment=ft.MainAxisAlignment.START,
-            ),
-            padding=10,
-        ),
-        ft.Row(
-            [nav_rail, ft.VerticalDivider(width=1), content_area],
-            expand=True,
-        ),
-    )
-
-    apply_layout(page.width)
-    page.on_resize = lambda e: apply_layout(page.width)
-    render_content()
+    show_login_view(page.width)
+    page.on_resize = lambda e: show_login_view(page.width)
 
 
 ft.app(target=main)
