@@ -5,7 +5,7 @@ from mocks import NAV_ITEMS
 BREAKPOINT_DESKTOP = 700
 
 
-def main(page: ft.Page):
+async def main(page: ft.Page):
     page.title = "Sistema de Asistencia"
     page.theme = ft.Theme(color_scheme_seed=ft.Colors.TEAL)
     page.padding = 0
@@ -46,14 +46,12 @@ def main(page: ft.Page):
         login_spinner.visible = is_loading
         page.update()
 
-    def do_login(e):
+    async def do_login(e):
         email = email_field.value.strip()
         password = password_field.value
-
         if not email or not password:
             show_error("Ingresa correo y contrasena")
             return
-
         set_loading(True)
         try:
             result = client.mutation(
@@ -61,6 +59,7 @@ def main(page: ft.Page):
             )
             session["token"] = result["token"]
             session["user"] = result["user"]
+            await page.shared_preferences.set("token", result["token"])
             build_app_view()
         except Exception:
             show_error("Correo o contrasena incorrectos")
@@ -129,12 +128,33 @@ def main(page: ft.Page):
             for icon, label in NAV_ITEMS[role]
         ]
 
+    async def do_logout(e):
+        if session["token"]:
+            try:
+                client.mutation("auth:logout", {"token": session["token"]})
+            except Exception:
+                pass
+        await page.shared_preferences.remove("token")
+        session["token"] = None
+        session["user"] = None
+        show_login_view(page.width)
+
     def render_content():
         role = session["user"]["role"]
         label = NAV_ITEMS[role][app_state["selected_index"]][1]
         content_area.content = ft.Column(
             [
-                ft.Text(f"Seccion: {label}", size=22, weight=ft.FontWeight.W_500),
+                ft.Row(
+                    [
+                        ft.Text(f"Seccion: {label}", size=22, weight=ft.FontWeight.W_500),
+                        ft.TextButton(
+                            content=ft.Text("Cerrar sesion"),
+                            icon=ft.Icons.LOGOUT,
+                            on_click=do_logout,
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
                 ft.Text(
                     f"Usuario: {session['user']['name']} ({role})",
                     color=ft.Colors.ON_SURFACE_VARIANT,
@@ -155,6 +175,7 @@ def main(page: ft.Page):
             page.add(login_view_desktop)
         else:
             page.add(login_view_mobile)
+        page.on_resize = lambda e: show_login_view(page.width)
         page.update()
 
     def apply_layout(width):
@@ -183,8 +204,23 @@ def main(page: ft.Page):
         page.on_resize = lambda e: apply_layout(page.width)
         render_content()
 
-    show_login_view(page.width)
-    page.on_resize = lambda e: show_login_view(page.width)
+    # Al arrancar: si hay un token guardado, validarlo contra Convex.
+    # Si sigue vigente, saltar directo a la app; si no, mostrar login.
+    saved_token = await page.shared_preferences.get("token")
+    if saved_token:
+        try:
+            user = client.mutation("auth:validateSession", {"token": saved_token})
+            if user:
+                session["token"] = saved_token
+                session["user"] = user
+                build_app_view()
+            else:
+                await page.shared_preferences.remove("token")
+                show_login_view(page.width)
+        except Exception:
+            show_login_view(page.width)
+    else:
+        show_login_view(page.width)
 
 
 ft.app(target=main)
