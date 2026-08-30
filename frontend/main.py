@@ -212,7 +212,12 @@ async def main(page: ft.Page):
 
     def render_academic_view():
         refresh_cycles()
-        if academic_state["entity"] == "Grupos":
+        if academic_state["entity"] == "Materias":
+            refresh_subjects()
+            section_title = "Materias"
+            section_add = open_create_subject_dialog
+            section_list = subjects_list_view
+        elif academic_state["entity"] == "Grupos":
             refresh_groups()
             section_title = "Grupos"
             section_add = open_create_group_dialog
@@ -356,6 +361,35 @@ async def main(page: ft.Page):
             actions=[
                 ft.TextButton(content=ft.Text("Cancelar"), on_click=close_dialog),
                 ft.TextButton(content=ft.Text("Crear"), on_click=create_group),
+            ],
+        )
+        page.show_dialog(dialog)
+    subjects_list_view = ft.Column(spacing=8)
+    subject_name_field = ft.TextField(label="Nombre (ej. Historia)", width=280)
+
+    def refresh_subjects():
+        subjects = client.query("academic:listSubjects")
+        subjects_list_view.controls = [ft.Text(s["name"]) for s in subjects]
+        page.update()
+
+    def create_subject(e):
+        name = subject_name_field.value.strip()
+        if not name:
+            show_error("Ingresa el nombre de la materia")
+            return
+        client.mutation("academic:createSubject", {"name": name})
+        subject_name_field.value = ""
+        page.pop_dialog()
+        refresh_subjects()
+
+    def open_create_subject_dialog(e):
+        subject_name_field.value = ""
+        dialog = ft.AlertDialog(
+            title=ft.Text("Nueva materia"),
+            content=ft.Column([subject_name_field], tight=True, spacing=10),
+            actions=[
+                ft.TextButton(content=ft.Text("Cancelar"), on_click=close_dialog),
+                ft.TextButton(content=ft.Text("Crear"), on_click=create_subject),
             ],
         )
         page.show_dialog(dialog)
