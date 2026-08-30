@@ -212,6 +212,15 @@ async def main(page: ft.Page):
 
     def render_academic_view():
         refresh_cycles()
+        if academic_state["entity"] == "Grados":
+            refresh_grades()
+            section_title = "Grados"
+            section_add = open_create_grade_dialog
+            section_list = grades_list_view
+        else:
+            section_title = "Ciclos escolares"
+            section_add = open_create_cycle_dialog
+            section_list = cycles_list_view
         content_area.content = ft.Column(
             [
                 ft.Row(
@@ -230,15 +239,62 @@ async def main(page: ft.Page):
                 ft.Container(height=10),
                 ft.Row(
                     [
-                        ft.Text("Ciclos escolares", weight=ft.FontWeight.W_500),
-                        ft.IconButton(icon=ft.Icons.ADD, on_click=open_create_cycle_dialog),
+                        ft.Text(section_title, weight=ft.FontWeight.W_500),
+                        ft.IconButton(icon=ft.Icons.ADD, on_click=section_add),
                     ],
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 ),
-                cycles_list_view,
+                section_list,
             ]
         )
         page.update()
+    grades_list_view = ft.Column(spacing=8)
+    grade_cycle_dropdown = ft.Dropdown(label="Ciclo escolar", width=280, options=[])
+    grade_name_field = ft.TextField(label="Nombre (ej. 1er grado)", width=280)
+
+    def refresh_grades():
+        cycles = client.query("academic:listCycles")
+        grade_cycle_dropdown.options = [
+            ft.DropdownOption(key=c["_id"], text=c["name"]) for c in cycles
+        ]
+        if cycles and not grade_cycle_dropdown.value:
+            grade_cycle_dropdown.value = cycles[0]["_id"]
+
+        if grade_cycle_dropdown.value:
+            grades = client.query(
+                "academic:listGradesByCycle", {"cycleId": grade_cycle_dropdown.value}
+            )
+            grades_list_view.controls = [ft.Text(g["name"]) for g in grades]
+        else:
+            grades_list_view.controls = [ft.Text("No hay ciclos escolares creados aun")]
+        page.update()
+
+    def create_grade(e):
+        name = grade_name_field.value.strip()
+        if not name or not grade_cycle_dropdown.value:
+            show_error("Completa el nombre y elige un ciclo")
+            return
+        client.mutation(
+            "academic:createGrade",
+            {"name": name, "cycleId": grade_cycle_dropdown.value},
+        )
+        grade_name_field.value = ""
+        page.pop_dialog()
+        refresh_grades()
+
+    def open_create_grade_dialog(e):
+        grade_name_field.value = ""
+        dialog = ft.AlertDialog(
+            title=ft.Text("Nuevo grado"),
+            content=ft.Column(
+                [grade_cycle_dropdown, grade_name_field], tight=True, spacing=10
+            ),
+            actions=[
+                ft.TextButton(content=ft.Text("Cancelar"), on_click=close_dialog),
+                ft.TextButton(content=ft.Text("Crear"), on_click=create_grade),
+            ],
+        )
+        page.show_dialog(dialog)
     def render_content():
         role = session["user"]["role"]
         label = NAV_ITEMS[role][app_state["selected_index"]][1]
