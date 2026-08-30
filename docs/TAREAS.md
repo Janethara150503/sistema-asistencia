@@ -13,7 +13,7 @@
 - [x] T8: Cliente Convex en Python + conexion configurada
 - [x] T9: Pantalla de login real (reemplaza selector de rol simulado)
 - [x] T10: Sesion persistente + logout real
-- [ ] T11: Admin - configuracion academica conectada (listar/crear ciclos, grados, grupos, materias)
+- [x] T11: Admin - configuracion academica conectada (listar/crear ciclos, grados, grupos, materias)
 - [ ] T12: Docente - registrar asistencia conectado (lista real de alumnos del grupo)
 - [ ] T13: Alumno - mi asistencia conectada (% real desde Convex)
 - [ ] T14: Notificaciones in-app conectadas
