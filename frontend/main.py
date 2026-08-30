@@ -212,7 +212,12 @@ async def main(page: ft.Page):
 
     def render_academic_view():
         refresh_cycles()
-        if academic_state["entity"] == "Grados":
+        if academic_state["entity"] == "Grupos":
+            refresh_groups()
+            section_title = "Grupos"
+            section_add = open_create_group_dialog
+            section_list = groups_list_view
+        elif academic_state["entity"] == "Grados":
             refresh_grades()
             section_title = "Grados"
             section_add = open_create_grade_dialog
@@ -292,6 +297,65 @@ async def main(page: ft.Page):
             actions=[
                 ft.TextButton(content=ft.Text("Cancelar"), on_click=close_dialog),
                 ft.TextButton(content=ft.Text("Crear"), on_click=create_grade),
+            ],
+        )
+        page.show_dialog(dialog)
+    groups_list_view = ft.Column(spacing=8)
+    group_grade_dropdown = ft.Dropdown(label="Grado", width=280, options=[])
+    group_name_field = ft.TextField(label="Nombre (ej. Grupo A)", width=280)
+
+    def refresh_groups():
+        cycles = client.query("academic:listCycles")
+        if not cycles:
+            groups_list_view.controls = [ft.Text("No hay ciclos escolares creados aun")]
+            page.update()
+            return
+
+        cycle_id = cycles[0]["_id"]
+        grades = client.query("academic:listGradesByCycle", {"cycleId": cycle_id})
+        group_grade_dropdown.options = [
+            ft.DropdownOption(key=g["_id"], text=g["name"]) for g in grades
+        ]
+        if grades and not group_grade_dropdown.value:
+            group_grade_dropdown.value = grades[0]["_id"]
+
+        if group_grade_dropdown.value:
+            groups = client.query(
+                "academic:listGroupsByGrade", {"gradeId": group_grade_dropdown.value}
+            )
+            groups_list_view.controls = [ft.Text(g["name"]) for g in groups]
+        else:
+            groups_list_view.controls = [ft.Text("No hay grados creados aun")]
+        page.update()
+
+    def create_group(e):
+        name = group_name_field.value.strip()
+        if not name or not group_grade_dropdown.value:
+            show_error("Completa el nombre y elige un grado")
+            return
+        cycles = client.query("academic:listCycles")
+        client.mutation(
+            "academic:createGroup",
+            {
+                "name": name,
+                "gradeId": group_grade_dropdown.value,
+                "cycleId": cycles[0]["_id"],
+            },
+        )
+        group_name_field.value = ""
+        page.pop_dialog()
+        refresh_groups()
+
+    def open_create_group_dialog(e):
+        group_name_field.value = ""
+        dialog = ft.AlertDialog(
+            title=ft.Text("Nuevo grupo"),
+            content=ft.Column(
+                [group_grade_dropdown, group_name_field], tight=True, spacing=10
+            ),
+            actions=[
+                ft.TextButton(content=ft.Text("Cancelar"), on_click=close_dialog),
+                ft.TextButton(content=ft.Text("Crear"), on_click=create_group),
             ],
         )
         page.show_dialog(dialog)
