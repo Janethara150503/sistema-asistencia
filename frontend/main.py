@@ -139,6 +139,106 @@ async def main(page: ft.Page):
         session["user"] = None
         show_login_view(page.width)
 
+    academic_state = {"entity": "Ciclos"}
+    cycles_list_view = ft.Column(spacing=8)
+
+    def refresh_cycles():
+        cycles = client.query("academic:listCycles")
+        cycles_list_view.controls = [
+            ft.Text(f"{c['name']} ({c['startDate']} a {c['endDate']})")
+            for c in cycles
+        ]
+        page.update()
+
+    cycle_name_field = ft.TextField(label="Nombre (ej. 2026-2027)", width=280)
+    cycle_start_field = ft.TextField(label="Fecha de inicio (YYYY-MM-DD)", width=280)
+    cycle_end_field = ft.TextField(label="Fecha de fin (YYYY-MM-DD)", width=280)
+
+    def close_dialog(e):
+        page.pop_dialog()
+
+    def create_cycle(e):
+        name = cycle_name_field.value.strip()
+        start = cycle_start_field.value.strip()
+        end = cycle_end_field.value.strip()
+        if not name or not start or not end:
+            show_error("Completa todos los campos")
+            return
+        client.mutation(
+            "academic:createCycle",
+            {"name": name, "startDate": start, "endDate": end},
+        )
+        cycle_name_field.value = ""
+        cycle_start_field.value = ""
+        cycle_end_field.value = ""
+        page.pop_dialog()
+        refresh_cycles()
+
+    def open_create_cycle_dialog(e):
+        cycle_name_field.value = ""
+        cycle_start_field.value = ""
+        cycle_end_field.value = ""
+        dialog = ft.AlertDialog(
+            title=ft.Text("Nuevo ciclo escolar"),
+            content=ft.Column(
+                [cycle_name_field, cycle_start_field, cycle_end_field],
+                tight=True,
+                spacing=10,
+            ),
+            actions=[
+                ft.TextButton(content=ft.Text("Cancelar"), on_click=close_dialog),
+                ft.TextButton(content=ft.Text("Crear"), on_click=create_cycle),
+            ],
+        )
+        page.show_dialog(dialog)
+
+    entity_dropdown = ft.Dropdown(
+        label="Entidad",
+        value="Ciclos",
+        width=280,
+        options=[
+            ft.DropdownOption(key="Ciclos", text="Ciclos escolares"),
+            ft.DropdownOption(key="Grados", text="Grados"),
+            ft.DropdownOption(key="Grupos", text="Grupos"),
+            ft.DropdownOption(key="Materias", text="Materias"),
+        ],
+    )
+
+    def on_entity_select(e):
+        academic_state["entity"] = entity_dropdown.value
+        render_academic_view()
+
+    entity_dropdown.on_select = on_entity_select
+
+    def render_academic_view():
+        refresh_cycles()
+        content_area.content = ft.Column(
+            [
+                ft.Row(
+                    [
+                        ft.Text("Configuracion academica", size=22, weight=ft.FontWeight.W_500),
+                        ft.TextButton(
+                            content=ft.Text("Cerrar sesion"),
+                            icon=ft.Icons.LOGOUT,
+                            on_click=do_logout,
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
+                ft.Divider(),
+                entity_dropdown,
+                ft.Container(height=10),
+                ft.Row(
+                    [
+                        ft.Text("Ciclos escolares", weight=ft.FontWeight.W_500),
+                        ft.IconButton(icon=ft.Icons.ADD, on_click=open_create_cycle_dialog),
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
+                cycles_list_view,
+            ]
+        )
+        page.update()
     def render_content():
         role = session["user"]["role"]
         label = NAV_ITEMS[role][app_state["selected_index"]][1]
@@ -167,7 +267,7 @@ async def main(page: ft.Page):
 
     def on_nav_change(e):
         app_state["selected_index"] = e.control.selected_index
-        render_content()
+        render_academic_view() if session["user"]["role"] == "admin" else render_content()
 
     def show_login_view(width):
         page.controls.clear()
@@ -202,7 +302,7 @@ async def main(page: ft.Page):
         )
         apply_layout(page.width)
         page.on_resize = lambda e: apply_layout(page.width)
-        render_content()
+        render_academic_view() if session["user"]["role"] == "admin" else render_content()
 
     # Al arrancar: si hay un token guardado, validarlo contra Convex.
     # Si sigue vigente, saltar directo a la app; si no, mostrar login.
